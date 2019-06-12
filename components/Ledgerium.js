@@ -1,5 +1,5 @@
 const Web3 = require('web3')
-const web3 = new Web3(new Web3.providers.HttpProvider("http://125.254.27.14:28545"));
+const web3 = new Web3(new Web3.providers.HttpProvider('http://125.254.27.14:28545'));
 const chalk = require('chalk')
 const request = require('request');
 const querystring = require('querystring');
@@ -21,9 +21,8 @@ class Ledgerium {
       .then((blockNumber) => {
         console.log(blockNumber)
 
-        this.getBalances(blockNumber)
-          .then((result) => {
-          })
+        this.getValidatorBalances(blockNumber)
+        this.getMinerBalance(blockNumber)
         
         //Store block number for the first time
         if ( this.count === 0 ) {
@@ -33,7 +32,7 @@ class Ledgerium {
           //If difference is 10, print balances
           if(blockNumber === this.oldBlock+this.diff){
             this.oldBlock = blockNumber;
-            console.log("---", this.balances)
+            console.log('---', this.balances)
             //Empty after 10 blocks
             this.balances = {} 
           }
@@ -41,7 +40,7 @@ class Ledgerium {
       })
   }
 
-  getBalances(blockNumber) {
+  getValidatorBalances(blockNumber) {
     return new Promise ((resolve, reject) => {
 
       this.getValidators()
@@ -49,12 +48,34 @@ class Ledgerium {
         for(let i=0; i<validators.length; i++) {
           web3.eth.getBalance(validators[i])
           .then(balance => {
-            if(this.balances[validators[i]] == undefined) this.balances[validators[i]] = {};
-            this.balances[validators[i]][blockNumber] = web3.utils.fromWei(balance, 'ether') + ' XLG';
+            let validator = 'validator_' + validators[i];
+            if(this.balances[validator] == undefined) this.balances[validator] = {};
+            this.balances[validator][blockNumber] = web3.utils.fromWei(balance, 'ether') + ' XLG';
           })
         }
-        resolve(this.balances);            
+        resolve();            
       })
+    })
+  }
+
+  getMinerBalance(blockNumber) {
+    return new Promise ((resolve, reject) => {
+      web3.eth.getBlock(blockNumber)
+          .then(block => {
+            if(!block) return reject('Invalid block')
+            if(block.number === 0) reject ('Block not found')
+            this.miner = block.miner
+            web3.eth.getBalance(block.miner)
+              .then(minerBalance => {
+                let miner = 'miner_' + block.miner;
+                if(this.balances[miner] == undefined) this.balances[miner] = {};
+                this.balances[miner][blockNumber] = web3.utils.fromWei(minerBalance, 'ether') + ' XLG';
+              })
+            resolve()
+          })
+          .catch(error => {
+            reject(error)
+          })
     })
   }
 
@@ -84,9 +105,8 @@ class Ledgerium {
       return new Promise((resolve, reject) => {
         web3.eth.getBlock('latest')
           .then(block => {
-            console.log(istanbul.getValidators())
-            if(!block) return reject("Invalid block")
-            if(block.number === 0) reject ("Block not found")
+            if(!block) return reject('Invalid block')
+            if(block.number === 0) reject ('Block not found')
             this.latestBlock = block.number
             this.miner = block.miner
             this.validators = block.validators
@@ -109,8 +129,8 @@ class Ledgerium {
         url: 'http://125.254.27.14:28545/',
         method: 'POST',
         json: { 
-          jsonrpc: "2.0", 
-          method: "istanbul_getValidators", 
+          jsonrpc: '2.0', 
+          method: 'istanbul_getValidators', 
           params: [], 
           id: new Date().getTime()
         },
@@ -122,7 +142,6 @@ class Ledgerium {
         }
       })
     })
-
   }
 
 }
